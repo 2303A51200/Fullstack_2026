@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Greenhouse Gas Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a18; min-height: 100vh; padding: 24px 16px; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #73726c; margin-bottom: 20px; }
+  .nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 0.5px solid #d3d1c7; padding-bottom: 12px; }
+  .nav-btn { padding: 6px 13px; border-radius: 8px; font-size: 12px; cursor: pointer; border: 0.5px solid transparent; background: transparent; color: #73726c; transition: all .15s; font-family: inherit; }
+  .nav-btn.active, .nav-btn:hover { background: #ebebeb; color: #1a1a18; border-color: #b4b2a9; font-weight: 500; }
+  .page { display: none; } .page.active { display: block; }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+  .metric-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+  .metric { background: #ebebeb; border-radius: 8px; padding: 12px 14px; }
+  .metric .val { font-size: 21px; font-weight: 500; color: #1a1a18; }
+  .metric .lbl { font-size: 12px; color: #73726c; margin-top: 3px; }
+  .metric .trend { font-size: 11px; margin-top: 4px; }
+  .up { color: #791f1f; } .down { color: #27500a; }
+  .card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; font-weight: 500; color: #73726c; margin-bottom: 12px; }
+  .two-col { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap: 12px; margin-bottom: 12px; }
+  .three-col { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: 12px; color: #73726c; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: middle; }
+  .gas-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 0.5px solid #e8e6df; font-size: 13px; }
+  .gas-row:last-child { border-bottom: none; }
+  .bar-track { flex: 1; height: 7px; background: #f1efe8; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tbl th { text-align: left; font-weight: 500; color: #73726c; padding: 6px 8px; border-bottom: 0.5px solid #d3d1c7; }
+  .tbl td { padding: 7px 8px; border-bottom: 0.5px solid #e8e6df; color: #1a1a18; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 500; }
+  .pill-red { background: #fcebeb; color: #791f1f; }
+  .pill-amber { background: #faeeda; color: #633806; }
+  .pill-green { background: #eaf3de; color: #27500a; }
+  .pill-blue { background: #e6f1fb; color: #0c447c; }
+  .pill-gray { background: #f1efe8; color: #444441; }
+  .effect-card { border: 0.5px solid #d3d1c7; border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+  .effect-card .ehead { font-weight: 500; color: #1a1a18; margin-bottom: 4px; }
+  .effect-card .esub { color: #73726c; line-height: 1.6; }
+  .progress-row { margin-bottom: 10px; }
+  .prog-label { display: flex; justify-content: space-between; font-size: 12px; color: #73726c; margin-bottom: 4px; }
+  .prog-track { height: 8px; background: #f1efe8; border-radius: 4px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 4px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .btn-row button { padding: 7px 14px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: transparent; cursor: pointer; color: #1a1a18; font-size: 13px; font-family: inherit; transition: background .15s; }
+  .btn-row button:hover { background: #ebebeb; }
+  .timeline-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 0.5px solid #e8e6df; }
+  .timeline-item:last-child { border-bottom: none; }
+  .t-year { min-width: 44px; font-size: 12px; font-weight: 500; color: #73726c; padding-top: 1px; }
+  .t-body { font-size: 12px; color: #1a1a18; line-height: 1.6; flex: 1; }
+  .t-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  @media (max-width: 600px) {
+    .metric-grid, .metric-grid-3 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .two-col, .three-col { grid-template-columns: 1fr; }
+  }
+
+  /* Login page */
+  #login-screen { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+  .login-box { background:#fff; border:0.5px solid #d3d1c7; border-radius:16px; padding:36px 32px; width:100%; max-width:380px; box-shadow:0 4px 24px rgba(0,0,0,0.07); }
+  .login-box h2 { font-size:18px; font-weight:600; margin-bottom:4px; }
+  .login-box p { font-size:12px; color:#73726c; margin-bottom:24px; }
+  .login-box label { font-size:12px; color:#73726c; display:block; margin-bottom:4px; margin-top:14px; }
+  .login-box input { width:100%; padding:9px 12px; border:0.5px solid #b4b2a9; border-radius:8px; font-size:13px; font-family:inherit; outline:none; transition:border .15s; background:#fafaf8; }
+  .login-box input:focus { border-color:#378ADD; }
+  .login-btn { width:100%; margin-top:20px; padding:10px; background:#1a1a18; color:#fff; border:none; border-radius:8px; font-size:13px; font-family:inherit; cursor:pointer; transition:background .15s; }
+  .login-btn:hover { background:#333; }
+  .login-error { font-size:12px; color:#791f1f; margin-top:10px; display:none; }
+  #main-app { display:none; }
+
+  /* Logout button */
+  .logout-btn { margin-left:auto; padding:6px 13px; border-radius:8px; font-size:12px; cursor:pointer; border:0.5px solid #b4b2a9; background:transparent; color:#791f1f; font-family:inherit; transition:all .15s; }
+  .logout-btn:hover { background:#fcebeb; }
+  .user-badge { font-size:12px; color:#73726c; display:flex; align-items:center; gap:6px; margin-left:auto; }
+  .nav-right { display:flex; align-items:center; gap:8px; margin-left:auto; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h2>🌿 GHG Dashboard</h2>
+    <p>Sign in to access the Greenhouse Gas & Global Warming Dashboard</p>
+    <label>Username</label>
+    <input type="text" id="login-user" placeholder="Enter username" />
+    <label>Password</label>
+    <input type="password" id="login-pass" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <div class="login-error" id="login-error">❌ Invalid username or password. Try: admin / password123</div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <p style="font-size:11px;color:#b4b2a9;text-align:center;margin-top:14px;">Demo credentials: admin / password123</p>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="main-app">
+<div class="container">
+  <h1>Greenhouse Gas & Global Warming Dashboard</h1>
+  <p class="subtitle">Based on: Tavassoli & Kamran-Pirzaman, ICTEM 2023 — Comparison of effective greenhouse gases and global warming</p>
+
+  <div class="nav">
+    <button class="nav-btn active" onclick="goPage('overview',this)">🏠 Home</button>
+    <button class="nav-btn" onclick="goPage('gases',this)">Gas profiles</button>
+    <button class="nav-btn" onclick="goPage('warming',this)">Global warming</button>
+    <button class="nav-btn" onclick="goPage('gwp',this)">GWP analysis</button>
+    <button class="nav-btn" onclick="goPage('sinks',this)">Sources & sinks</button>
+    <button class="nav-btn" onclick="goPage('mitigation',this)">Mitigation</button>
+    <div class="nav-right">
+      <span class="user-badge" id="user-badge">👤 <span id="logged-user"></span></span>
+      <button class="logout-btn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- PAGE 1: OVERVIEW -->
+  <div id="page-overview" class="page active">
+    <div class="metric-grid">
+      <div class="metric"><div class="val">420 <span style="font-size:13px;font-weight:400;">ppm</span></div><div class="lbl">CO₂ (2022)</div><div class="trend up">▲ 30% since 1980</div></div>
+      <div class="metric"><div class="val">1,950 <span style="font-size:13px;font-weight:400;">ppb</span></div><div class="lbl">CH₄ (2022)</div><div class="trend up">▲ 22% since 1984</div></div>
+      <div class="metric"><div class="val">337 <span style="font-size:13px;font-weight:400;">ppb</span></div><div class="lbl">N₂O (2022)</div><div class="trend up">▲ 25% since 1750</div></div>
+      <div class="metric"><div class="val">+1.1 <span style="font-size:13px;font-weight:400;">°C</span></div><div class="lbl">Warming since 1850</div><div class="trend up">▲ 0.7°C since 1990</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">Atmospheric concentration trends (1984–2022)</div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#378ADD;"></span>CO₂ ppm</span>
+          <span><span class="leg-dot" style="background:#1D9E75;"></span>CH₄ ÷10 ppb</span>
+          <span><span class="leg-dot" style="background:#BA7517;"></span>N₂O ppb</span>
+        </div>
+        <div style="position:relative;width:100%;height:200px;"><canvas id="c-trend"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Emissions share 2016 (CO₂e)</div>
+        <div style="position:relative;width:100%;height:150px;margin-bottom:8px;"><canvas id="c-pie"></canvas></div>
+        <div class="legend" style="justify-content:center;">
+          <span><span class="leg-dot" style="background:#378ADD;"></span>CO₂ 74.4%</span>
+          <span><span class="leg-dot" style="background:#1D9E75;"></span>CH₄ 17.3%</span>
+          <span><span class="leg-dot" style="background:#BA7517;"></span>N₂O 6.2%</span>
+          <span><span class="leg-dot" style="background:#888780;"></span>Other 2.1%</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Key findings summary</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;">
+        <div class="effect-card"><div class="ehead">Primary driver</div><div class="esub">CO₂ from fossil fuels and industrial processes accounts for 74% of all GHG emissions by CO₂e.</div></div>
+        <div class="effect-card"><div class="ehead">GWP ≠ impact</div><div class="esub">SF₆ has GWP of 23,500 but trace abundance. Volume × potency together determine real-world warming.</div></div>
+        <div class="effect-card"><div class="ehead">All gases rising</div><div class="esub">CO₂, CH₄, and N₂O all show nearly linear upward trends since 1980 — current controls are insufficient.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 2: GAS PROFILES -->
+  <div id="page-gases" class="page">
+    <div class="card">
+      <div class="card-title">Individual gas concentration over time</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="nav-btn active" id="gb-co2" onclick="switchGas('co2',this)">CO₂</button>
+        <button class="nav-btn" id="gb-ch4" onclick="switchGas('ch4',this)">CH₄</button>
+        <button class="nav-btn" id="gb-n2o" onclick="switchGas('n2o',this)">N₂O</button>
+      </div>
+      <div style="position:relative;width:100%;height:220px;"><canvas id="c-gas"></canvas></div>
+    </div>
+    <div class="three-col">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">CO₂ profile</div>
+        <table class="tbl">
+          <tr><td style="color:#73726c;">Formula</td><td>Carbon dioxide</td></tr>
+          <tr><td style="color:#73726c;">GWP₁₀₀</td><td>1 (reference)</td></tr>
+          <tr><td style="color:#73726c;">2022 level</td><td>420 ppm</td></tr>
+          <tr><td style="color:#73726c;">Emission share</td><td><span class="pill pill-blue">74.4%</span></td></tr>
+          <tr><td style="color:#73726c;">Status</td><td><span class="pill pill-red">Critical</span></td></tr>
+        </table>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">CH₄ profile</div>
+        <table class="tbl">
+          <tr><td style="color:#73726c;">Formula</td><td>Methane</td></tr>
+          <tr><td style="color:#73726c;">GWP₁₀₀</td><td>28</td></tr>
+          <tr><td style="color:#73726c;">2022 level</td><td>1,950 ppb</td></tr>
+          <tr><td style="color:#73726c;">Emission share</td><td><span class="pill pill-blue">17.3%</span></td></tr>
+          <tr><td style="color:#73726c;">Status</td><td><span class="pill pill-amber">High</span></td></tr>
+        </table>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">N₂O profile</div>
+        <table class="tbl">
+          <tr><td style="color:#73726c;">Formula</td><td>Nitrous oxide</td></tr>
+          <tr><td style="color:#73726c;">GWP₁₀₀</td><td>265</td></tr>
+          <tr><td style="color:#73726c;">2022 level</td><td>337 ppb</td></tr>
+          <tr><td style="color:#73726c;">Emission share</td><td><span class="pill pill-blue">6.2%</span></td></tr>
+          <tr><td style="color:#73726c;">Status</td><td><span class="pill pill-amber">Moderate</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 3: GLOBAL WARMING -->
+  <div id="page-warming" class="page">
+    <div class="metric-grid-3">
+      <div class="metric"><div class="val">−0.4 <span style="font-size:13px;font-weight:400;">°C</span></div><div class="lbl">Anomaly in 1850</div><div class="trend" style="color:#73726c;">vs 1961–1990 baseline</div></div>
+      <div class="metric"><div class="val">+0.7 <span style="font-size:13px;font-weight:400;">°C</span></div><div class="lbl">Anomaly ~2020</div><div class="trend up">▲ vs 1961–1990</div></div>
+      <div class="metric"><div class="val">+1.1 <span style="font-size:13px;font-weight:400;">°C</span></div><div class="lbl">Total rise 1850–2019</div><div class="trend up">▲ Fastest in recent decades</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Simulated global temperature anomaly (°C vs 1961–1990 baseline)</div>
+      <div style="position:relative;width:100%;height:220px;"><canvas id="c-temp"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Climate change effects</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+        <div class="effect-card"><div class="ehead">Extreme heat waves</div><div class="esub">Frequency and intensity of heat events increasing with each 0.1°C rise.</div></div>
+        <div class="effect-card"><div class="ehead">Flooding & coastlines</div><div class="esub">Extreme rainfall, sea-level rise, and coastline erosion accelerating.</div></div>
+        <div class="effect-card"><div class="ehead">Wildfires</div><div class="esub">Augmented risk from drier conditions and higher ambient temperatures.</div></div>
+        <div class="effect-card"><div class="ehead">Ozone depletion</div><div class="esub">N₂O consumes stratospheric ozone; halocarbons further erode the layer.</div></div>
+        <div class="effect-card"><div class="ehead">Water cycle shifts</div><div class="esub">Warmer air holds more vapor — intensifying both drought and precipitation.</div></div>
+        <div class="effect-card"><div class="ehead">Soil & eutrophication</div><div class="esub">Changes in moisture, acidification, and nutrient runoff affect ecosystems.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 4: GWP ANALYSIS -->
+  <div id="page-gwp" class="page">
+    <div class="card">
+      <div class="card-title">GWP₁₀₀ — warming potential relative to CO₂ (log scale)</div>
+      <div style="position:relative;width:100%;height:240px;"><canvas id="c-gwp"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">GWP vs actual emission share — why volume matters</div>
+      <div style="position:relative;width:100%;height:200px;"><canvas id="c-bubble"></canvas></div>
+      <p style="font-size:12px;color:#888780;margin:8px 0 0;">Bubble size = emission share (CO₂e). High GWP gases like SF₆ score low in real impact due to trace concentrations.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Full GWP reference table</div>
+      <table class="tbl">
+        <thead><tr><th>Gas</th><th>GWP₁₀₀</th><th>Atm. lifetime</th><th>2022 level</th><th>Priority</th></tr></thead>
+        <tbody>
+          <tr><td>CO₂</td><td>1</td><td>Centuries</td><td>420 ppm</td><td><span class="pill pill-red">Critical</span></td></tr>
+          <tr><td>CH₄</td><td>28</td><td>~12 years</td><td>1,950 ppb</td><td><span class="pill pill-red">Critical</span></td></tr>
+          <tr><td>N₂O</td><td>265</td><td>116 ± 9 yr</td><td>337 ppb</td><td><span class="pill pill-amber">High</span></td></tr>
+          <tr><td>HFC-152a</td><td>135</td><td>~1.5 yr</td><td>Trace</td><td><span class="pill pill-amber">Moderate</span></td></tr>
+          <tr><td>PFC-14</td><td>6,630</td><td>50,000 yr</td><td>Trace</td><td><span class="pill pill-gray">Low volume</span></td></tr>
+          <tr><td>SF₆</td><td>23,500</td><td>3,200 yr</td><td>Trace</td><td><span class="pill pill-gray">Low volume</span></td></tr>
+          <tr><td>H₂O</td><td>Feedback</td><td>Days</td><td>Variable</td><td><span class="pill pill-blue">Amplifier</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAGE 5: SOURCES & SINKS -->
+  <div id="page-sinks" class="page">
+    <div class="two-col">
+      <div class="card">
+        <div class="card-title">CO₂ sources vs sinks</div>
+        <div style="position:relative;width:100%;height:200px;"><canvas id="c-co2-ss"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">CH₄ sources breakdown</div>
+        <div style="position:relative;width:100%;height:200px;"><canvas id="c-ch4-ss"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Water vapor — stratospheric entry mechanisms</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px;">
+        <div class="effect-card"><div class="ehead">Hadley cell updrafts</div><div class="esub">Large-scale air mass rising + convective storm penetrations over tropics.</div></div>
+        <div class="effect-card"><div class="ehead">Mid-latitude convection</div><div class="esub">Intensive storm tropopause penetrations during warmer months.</div></div>
+        <div class="effect-card"><div class="ehead">Methane oxidation</div><div class="esub">CH₄ from troposphere oxidises into H₂O in the stratosphere.</div></div>
+      </div>
+      <div class="progress-row"><div class="prog-label"><span>Atmospheric water (% of total freshwater)</span><span>0.04%</span></div><div class="prog-track"><div class="prog-fill" style="width:2%;background:#378ADD;"></div></div></div>
+      <div class="progress-row"><div class="prog-label"><span>Total freshwater (% of all water)</span><span>2.5%</span></div><div class="prog-track"><div class="prog-fill" style="width:25%;background:#1D9E75;"></div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">N₂O emission sources</div>
+      <div class="gas-row"><div style="min-width:160px;font-size:13px;">Nitrogen fertilizers</div><div class="bar-track"><div class="bar-fill" style="width:65%;background:#BA7517;"></div></div><div style="font-size:12px;color:#73726c;min-width:36px;text-align:right;">~65%</div></div>
+      <div class="gas-row"><div style="min-width:160px;font-size:13px;">Soil microbes</div><div class="bar-track"><div class="bar-fill" style="width:20%;background:#EF9F27;"></div></div><div style="font-size:12px;color:#73726c;min-width:36px;text-align:right;">~20%</div></div>
+      <div class="gas-row"><div style="min-width:160px;font-size:13px;">Ocean emissions</div><div class="bar-track"><div class="bar-fill" style="width:10%;background:#888780;"></div></div><div style="font-size:12px;color:#73726c;min-width:36px;text-align:right;">~10%</div></div>
+      <div class="gas-row"><div style="min-width:160px;font-size:13px;">Vehicle exhaust</div><div class="bar-track"><div class="bar-fill" style="width:5%;background:#D3D1C7;"></div></div><div style="font-size:12px;color:#73726c;min-width:36px;text-align:right;">~5%</div></div>
+    </div>
+  </div>
+
+  <!-- PAGE 6: MITIGATION -->
+  <div id="page-mitigation" class="page">
+    <div class="metric-grid-3">
+      <div class="metric"><div class="val">74%</div><div class="lbl">CO₂ of all GHG</div><div class="trend" style="color:#73726c;">Main target for action</div></div>
+      <div class="metric"><div class="val">5</div><div class="lbl">Key capture methods</div><div class="trend" style="color:#73726c;">Tech + policy approaches</div></div>
+      <div class="metric"><div class="val">2%</div><div class="lbl">N₂O growth/decade</div><div class="trend up">Fertiliser controls needed</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Mitigation strategies — feasibility vs impact</div>
+      <div style="position:relative;width:100%;height:220px;"><canvas id="c-miti"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">CO₂ capture technologies</div>
+      <table class="tbl">
+        <thead><tr><th>Method</th><th>Mechanism</th><th>Stage</th></tr></thead>
+        <tbody>
+          <tr><td>Energetic dark greenhouse</td><td>Direct air capture using specialised greenhouse structures</td><td><span class="pill pill-amber">Research</span></td></tr>
+          <tr><td>Transparent solar cells</td><td>Energy generation with lower CO₂ lifecycle vs fossil fuels</td><td><span class="pill pill-amber">Emerging</span></td></tr>
+          <tr><td>Amine solvent absorption</td><td>Chemical absorption of CO₂ from air using amine solutions</td><td><span class="pill pill-blue">Pilot scale</span></td></tr>
+          <tr><td>Microalgae (3rd gen biomass)</td><td>Biological CO₂ capture via photosynthesis at scale</td><td><span class="pill pill-blue">Pilot scale</span></td></tr>
+          <tr><td>Renewable energy transition</td><td>Replace fossil fuels with solar, wind, hydro</td><td><span class="pill pill-green">Deployed</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Policy timeline — key milestones</div>
+      <div class="timeline-item"><div class="t-year">1987</div><div class="t-dot" style="background:#378ADD;"></div><div class="t-body">Montreal Protocol — first global treaty restricting halocarbons to protect the ozone layer.</div></div>
+      <div class="timeline-item"><div class="t-year">1997</div><div class="t-dot" style="background:#1D9E75;"></div><div class="t-body">Kyoto Protocol — binding GHG reduction targets for developed nations.</div></div>
+      <div class="timeline-item"><div class="t-year">2015</div><div class="t-dot" style="background:#BA7517;"></div><div class="t-body">Paris Agreement — 196 nations commit to limit warming to 1.5–2°C above pre-industrial levels.</div></div>
+      <div class="timeline-item"><div class="t-year">2022</div><div class="t-dot" style="background:#D85A30;"></div><div class="t-body">All three major GHGs (CO₂, CH₄, N₂O) reach all-time high concentrations — current policies insufficient.</div></div>
+      <div class="timeline-item"><div class="t-year">Now</div><div class="t-dot" style="background:#888780;"></div><div class="t-body">Urgent scale-up of capture tech, renewable transition, and agricultural emission controls required.</div></div>
+    </div>
+  </div>
+
+</div>
+</div><!-- end main-app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// --- AUTH ---
+const USERS = { admin: 'password123', user: 'ghg2024' };
+
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-error');
+  if (USERS[u] && USERS[u] === p) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    document.getElementById('logged-user').textContent = u;
+    err.style.display = 'none';
+    initCharts();
+  } else {
+    err.style.display = 'block';
+  }
+}
+
+function doLogout() {
+  if (!confirm('Sign out of the dashboard?')) return;
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+// --- END AUTH ---
+
+function goPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav .nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+function initCharts() {
+const years = [1984,1988,1992,1996,2000,2004,2008,2012,2016,2020,2022];
+const co2data = [344,351,356,362,369,377,385,393,403,412,420];
+const ch4data = [1645,1686,1714,1730,1745,1773,1797,1815,1843,1879,1950].map(v=>Math.round(v/10));
+const n2odata = [306,308,311,313,316,318,321,324,328,333,337];
+
+new Chart(document.getElementById('c-trend'), {
+  type: 'line',
+  data: { labels: years, datasets: [
+    { label:'CO₂', data:co2data, borderColor:'#378ADD', tension:.3, pointRadius:2, borderWidth:2, backgroundColor:'transparent' },
+    { label:'CH₄÷10', data:ch4data, borderColor:'#1D9E75', tension:.3, pointRadius:2, borderWidth:2, backgroundColor:'transparent' },
+    { label:'N₂O', data:n2odata, borderColor:'#BA7517', tension:.3, pointRadius:2, borderWidth:2, backgroundColor:'transparent' }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{ x:{ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.12)'}}, y:{ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.12)'}} } }
+});
+
+new Chart(document.getElementById('c-pie'), {
+  type:'doughnut',
+  data: { labels:['CO₂','CH₄','N₂O','Other'], datasets:[{data:[74.4,17.3,6.2,2.1], backgroundColor:['#378ADD','#1D9E75','#BA7517','#888780'], borderWidth:0}] },
+  options: { responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{display:false}} }
+});
+
+const gasDatasets = {
+  co2: { label:'CO₂ (ppm)', data:co2data, color:'#378ADD' },
+  ch4: { label:'CH₄ (ppb)', data:[1645,1686,1714,1730,1745,1773,1797,1815,1843,1879,1950], color:'#1D9E75' },
+  n2o: { label:'N₂O (ppb)', data:n2odata, color:'#BA7517' }
+};
+let gasChart = new Chart(document.getElementById('c-gas'), {
+  type:'line',
+  data: { labels:years, datasets:[{ label:'CO₂ (ppm)', data:co2data, borderColor:'#378ADD', tension:.3, pointRadius:3, borderWidth:2, backgroundColor:'rgba(55,138,221,0.08)', fill:true }] },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{ x:{ticks:{color:'#888780',font:{size:11}},grid:{color:'rgba(136,135,128,0.12)'}}, y:{ticks:{color:'#888780',font:{size:11}},grid:{color:'rgba(136,135,128,0.12)'}} } }
+});
+
+function switchGas(key, el) {
+  document.querySelectorAll('[id^="gb-"]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const d = gasDatasets[key];
+  gasChart.data.datasets[0].label = d.label;
+  gasChart.data.datasets[0].data = d.data;
+  gasChart.data.datasets[0].borderColor = d.color;
+  gasChart.data.datasets[0].backgroundColor = d.color + '14';
+  gasChart.update();
+}
+
+const tempYears = [1850,1870,1890,1910,1930,1950,1970,1990,2000,2010,2019];
+const tempVals  = [-0.40,-0.38,-0.35,-0.42,-0.15,-0.05,0.02,0.30,0.42,0.55,0.70];
+new Chart(document.getElementById('c-temp'), {
+  type:'line',
+  data: { labels:tempYears, datasets:[{ label:'Temp anomaly (°C)', data:tempVals, borderColor:'#D85A30', tension:.35, pointRadius:3, borderWidth:2, backgroundColor:'rgba(216,90,48,0.08)', fill:true }] },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{ x:{ticks:{color:'#888780',font:{size:11}},grid:{color:'rgba(136,135,128,0.12)'}}, y:{ticks:{color:'#888780',font:{size:10},callback:v=>v.toFixed(1)+'°'},grid:{color:'rgba(136,135,128,0.12)'}} } }
+});
+
+new Chart(document.getElementById('c-gwp'), {
+  type:'bar',
+  data: { labels:['CO₂','CH₄','N₂O','HFC-152a','PFC-14','SF₆'],
+    datasets:[{label:'GWP₁₀₀', data:[1,28,265,135,6630,23500], backgroundColor:['#378ADD','#1D9E75','#BA7517','#888780','#7F77DD','#D85A30'], borderWidth:0, borderRadius:4}]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{ x:{ticks:{color:'#888780',font:{size:11}},grid:{display:false}}, y:{type:'logarithmic',ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.12)'}} } }
+});
+
+new Chart(document.getElementById('c-bubble'), {
+  type:'bubble',
+  data: { datasets:[
+    { label:'CO₂',    data:[{x:1,    y:74.4, r:18}], backgroundColor:'rgba(55,138,221,0.7)' },
+    { label:'CH₄',    data:[{x:28,   y:17.3, r:10}], backgroundColor:'rgba(29,158,117,0.7)' },
+    { label:'N₂O',    data:[{x:265,  y:6.2,  r:6 }], backgroundColor:'rgba(186,117,23,0.7)' },
+    { label:'PFC-14', data:[{x:6630, y:0.5,  r:3 }], backgroundColor:'rgba(127,119,221,0.7)' },
+    { label:'SF₆',    data:[{x:23500,y:0.3,  r:3 }], backgroundColor:'rgba(216,90,48,0.7)' }
+  ]},
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{color:'#73726c',font:{size:11},boxWidth:10}}},
+    scales:{
+      x:{type:'logarithmic',title:{display:true,text:'GWP₁₀₀ (log scale)',color:'#888780',font:{size:11}},ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.12)'}},
+      y:{title:{display:true,text:'Emission share %',color:'#888780',font:{size:11}},ticks:{color:'#888780',font:{size:10},callback:v=>v+'%'},min:0,max:85,grid:{color:'rgba(136,135,128,0.12)'}}
+    }
+  }
+});
+
+new Chart(document.getElementById('c-co2-ss'), {
+  type:'bar',
+  data: { labels:['Fossil fuels','Deforestation','Cement/steel','Volcanoes','Photosynthesis','Oceans','Soil'],
+    datasets:[{label:'Relative flux', data:[60,18,8,3,-45,-25,-10],
+      backgroundColor: [60,18,8,3,-45,-25,-10].map(v=>v<0?'#1D9E75':'#378ADD'),
+      borderWidth:0, borderRadius:3}]
+  },
+  options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+    scales:{ x:{ticks:{color:'#888780',font:{size:9},maxRotation:35},grid:{display:false}}, y:{ticks:{color:'#888780',font:{size:10}},grid:{color:'rgba(136,135,128,0.12)'}} } }
+});
+
+new Chart(document.getElementById('c-ch4-ss'), {
+  type:'doughnut',
+  data: { labels:['Agriculture','Natural wetlands','Coal/gas industry','Waste processing','Other natural'],
+    datasets:[{data:[40,22,20,12,6], backgroundColor:['#1D9E75','#5DCAA5','#9FE1CB','#BA7517','#D3D1C7'], borderWidth:0}]
+  },
+  options: { responsive:true, maintainAspectRatio:false, cutout:'55%',
+    plugins:{legend:{labels:{color:'#73726c',font:{size:10},boxWidth:10}}} }
+});
+
+new Chart(document.getElementById('c-miti'), {
+  type:'bar',
+  data: { labels:['Renewable energy','Amine CO₂ capture','Microalgae capture','Transparent solar','Dark greenhouse DAC','Policy & legislation'],
+    datasets:[
+      { label:'Feasibility',       data:[85,55,45,60,35,70], backgroundColor:'rgba(55,138,221,0.75)', borderRadius:3, borderWidth:0 },
+      { label:'Impact potential',  data:[90,50,60,40,55,75], backgroundColor:'rgba(29,158,117,0.75)', borderRadius:3, borderWidth:0 }
+    ]
+  },
+  options: { responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#73726c',font:{size:11},boxWidth:10}}},
+    scales:{ x:{ticks:{color:'#888780',font:{size:10},maxRotation:30},grid:{display:false}}, y:{max:100,ticks:{color:'#888780',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(136,135,128,0.12)'}} } }
+});
+} // end initCharts
+</script>
+</body>
+</html>
